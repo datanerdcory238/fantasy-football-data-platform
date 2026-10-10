@@ -31,7 +31,7 @@ season fantasy scoring.
 
 ## Quick start
 
-**Prerequisites:** Python 3.11+, Git, and Docker Desktop.
+**Prerequisites:** Python 3.11+ (tested on 3.15), Git, and Docker Desktop. On Windows, see [docs/setup_windows.md](docs/setup_windows.md).
 
 ```bash
 # 1. Python environment

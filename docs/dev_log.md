@@ -4,6 +4,32 @@ Newest entries at the top. Each entry covers what was done, what was learned, an
 
 ---
 
+## 2026-10-10 (evening): Published to GitHub + Python environment ready
+
+**Done**
+- Repo published: https://github.com/datanerdcory238/fantasy-football-data-platform (first commit `5d4e7aa`, 34 files).
+- Moved `ci.yml` into `.github/workflows/` so GitHub Actions runs the tests on every push.
+- Created the virtual environment `.venv` with **Python 3.15.0** and installed `requirements-dev.txt`.
+  Installed versions: requests 2.34.2, beautifulsoup4 4.15.0, lxml 6.1.3, psycopg 3.3.6 (binary),
+  python-dotenv 1.2.4, pytest 9.1.1. The earlier worry that Python 3.15 wouldn't be supported turned out to be fine.
+- Added Git/GitHub and virtual-environment sections to [setup_windows.md](setup_windows.md).
+
+**Learned**
+- Git commands must run inside the project folder. Running `git init` in the home folder tried to track the
+  whole user profile (fixed by deleting the stray `.git`/`.github` there).
+- VS Code's Source Control panel is a button version of `git add` / `commit` / `push`.
+- `.md` files are written instructions (Markdown) that GitHub displays as web pages. They don't run anything.
+- File Explorer's "Documents" may point to OneDrive\Documents. The project is in `C:\Users\coryh\Documents`.
+
+**Next (where to pick up)**
+- [ ] Commit and push the latest doc changes.
+- [ ] `docker compose up -d` → `python -m ffdata init-db`
+- [ ] `pytest -q` (all 16 tests should pass)
+- [ ] First live scrape: `schedule --season 2025`, `positions --season 2025`, `boxscores --season 2025 --week 1`
+- [ ] Check results with SQL, then write a user guide (`docs/user_guide.md`) with example queries.
+
+---
+
 ## 2026-10-10 (later): Development environment set up on Windows
 
 **Done**
@@ -15,13 +41,12 @@ Newest entries at the top. Each entry covers what was done, what was learned, an
 - Terminal vs. shell, text editor vs. IDE, Git vs. GitHub, and what Docker containers, images, and volumes are.
 
 **Watch out for**
-- Python 3.15 is very new, so some libraries (psycopg, lxml) may not have Windows packages for it yet. If
-  `pip install` fails, install Python 3.13 alongside it and create the venv with `py -3.13 -m venv .venv`.
+- Python 3.15 is very new, so some libraries might not support it yet. *(Update: all libraries installed fine. See the
+  next entry.)*
 
 **Next**
-- [ ] Create the GitHub repo, then `git init` and the first push.
-- [ ] Create the venv, install requirements, `docker compose up -d`, `python -m ffdata init-db`.
-- [ ] First live scrape: `schedule` and `boxscores --week 1` for 2025.
+- [x] Create the GitHub repo, then `git init` and the first push.
+- [x] Create the venv and install requirements.
 
 ---
 
