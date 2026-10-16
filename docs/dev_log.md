@@ -4,6 +4,31 @@ Newest entries at the top. Each entry covers what was done, what was learned, an
 
 ---
 
+## 2026-10-15/16: Database created, tests passing, switching to Claude Code
+
+**Done**
+- Created `.env` with custom values: database `nfl_fantasy`, user `cholbein`, own password. `.env` is git-ignored.
+- `docker compose up -d` started PostgreSQL. `python -m ffdata init-db` created the 7 tables (empty).
+- `pytest -q`: **16 passed** on Cory's machine.
+- Added `CLAUDE.md` (project context for Claude Code) so work can continue there.
+
+**Learned**
+- Server vs. database: `docker compose up -d` starts the PostgreSQL server (and creates the DB the first time).
+  `init-db` creates tables. Data lives in a Docker volume, not the project folder. You browse it with psql or DBeaver.
+- Table vs. view: fantasy points (`pts_standard`, `pts_half_ppr`, `pts_ppr`) are calculated in
+  `vw_player_game_fantasy`, not stored.
+- Interpreter = the `python.exe` that runs the code. `.venv` has its own interpreter with the project libraries.
+- Everything in Step 1 is free. Costs start with AWS in Step 2 (set a budget alert first).
+
+**Issues hit**
+- `ModuleNotFoundError: No module named 'dotenv'` when the venv wasn't active. Fix: `.venv\Scripts\activate`.
+- Ctrl+Shift+X didn't work (Bluetooth keyboard problem). Use **View → Extensions** instead.
+
+**Next**
+- [ ] Activate the venv and run the first live scrape: `python -m ffdata schedule --season 2025`.
+
+---
+
 ## 2026-10-10 (evening): Published to GitHub + Python environment ready
 
 **Done**
