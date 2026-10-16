@@ -2,10 +2,9 @@
 
 Usage (from the repo root):
     python -m ffdata init-db
-    python -m ffdata schedule  --season 2025
-    python -m ffdata positions --season 2025
-    python -m ffdata boxscores --season 2025 --week 1
-    python -m ffdata season    --season 2025          # all of the above
+    python -m ffdata games  --season 2026
+    python -m ffdata stats  --season 2026 --week 5   # --week is optional
+    python -m ffdata season --season 2026            # games + stats + build-models
     python -m ffdata build-models
     python -m ffdata status
 """
@@ -31,17 +30,14 @@ def _build_parser() -> argparse.ArgumentParser:
     sub.add_parser("status", help="show row counts and recent runs")
 
     for name, help_ in [
-        ("schedule", "scrape season schedule/results into games"),
-        ("positions", "scrape season fantasy positions into player_seasons"),
-        ("boxscores", "scrape box-score offense stats for completed games"),
-        ("season", "schedule + positions + boxscores + build-models"),
+        ("games", "load the season's games (schedule and scores) from nflverse"),
+        ("stats", "load weekly offensive player stats from nflverse"),
+        ("season", "games + stats + build-models"),
     ]:
         sp = sub.add_parser(name, help=help_)
         sp.add_argument("--season", type=int, required=True)
-        if name in ("boxscores", "season"):
+        if name == "stats":
             sp.add_argument("--week", type=int, help="limit to one week")
-            sp.add_argument("--force", action="store_true",
-                            help="re-load games that already have stats")
     return p
 
 
@@ -81,21 +77,17 @@ def main(argv: list[str] | None = None) -> int:
             cmd_status(conn)
             return 0
 
-        # Scraping commands: wrap in a logged run.
-        arg_str = f"season={args.season}"
-        if getattr(args, "week", None):
-            arg_str += f" week={args.week}"
+        # Load commands: wrap in a logged run.
+        week = getattr(args, "week", None)
+        arg_str = f"season={args.season}" + (f" week={week}" if week else "")
         run_id = db.start_run(conn, args.command, arg_str)
         stats = pipeline.RunStats()
         fetcher = PoliteFetcher()
         try:
-            if args.command in ("schedule", "season"):
-                pipeline.scrape_schedule(conn, fetcher, args.season, stats)
-            if args.command in ("positions", "season"):
-                pipeline.scrape_positions(conn, fetcher, args.season, stats)
-            if args.command in ("boxscores", "season"):
-                pipeline.scrape_box_scores(conn, fetcher, args.season, stats,
-                                           week=args.week, force=args.force)
+            if args.command in ("games", "season"):
+                pipeline.load_games(conn, fetcher, args.season, stats)
+            if args.command in ("stats", "season"):
+                pipeline.load_player_stats(conn, fetcher, args.season, stats, week=week)
             if args.command == "season":
                 db.build_models(conn)
         except Exception as exc:
@@ -104,12 +96,8 @@ def main(argv: list[str] | None = None) -> int:
             log.exception("run #%d failed", run_id)
             return 1
 
-        status = "partial" if stats.failures else "success"
-        error = f"failed games: {', '.join(stats.failures)}" if stats.failures else None
-        db.finish_run(conn, run_id, status, stats.as_dict(), error)
-        print(f"run #{run_id} {status}: {stats.as_dict()}")
-        if stats.failures:
-            print(f"  {len(stats.failures)} game(s) failed — re-run the same command to retry.")
+        db.finish_run(conn, run_id, "success", stats.as_dict())
+        print(f"run #{run_id} success: {stats.as_dict()}")
         return 0
 
 

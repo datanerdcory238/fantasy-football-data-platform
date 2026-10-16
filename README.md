@@ -4,21 +4,21 @@ An end-to-end NFL / fantasy-football data platform, built step by step as a hand
 data engineering, analytics, and applied AI.
 
 **Current stage: Step 1 – Python + SQL data engineering foundations.**
-This stage scrapes NFL game and player data from Pro-Football-Reference, keeps the raw HTML, parses it
-with Python, loads it into PostgreSQL with idempotent upserts, and builds SQL models for weekly and
-season fantasy scoring.
+This stage downloads open NFL game and player data from [nflverse](https://github.com/nflverse/nflverse-data)
+through the GitHub API, keeps the raw files, transforms them with Python, loads them into PostgreSQL with
+idempotent upserts, and builds SQL models for weekly and season fantasy scoring.
 
 ```
- Pro-Football-Reference ──► PoliteFetcher ──► data/raw/ (raw HTML)  ──► parsers ──► PostgreSQL ──► SQL views
-   (games, box scores,      robots.txt,        "bronze" layer,           pure          tables        fantasy points
-    fantasy positions)      rate limit, retry  re-parseable              functions     (upserts)     per game / season
+ nflverse (GitHub API) ──► PoliteFetcher ──► data/raw/ (raw CSV)    ──► transforms ──► PostgreSQL ──► SQL views
+   (games, weekly           robots.txt,        "bronze" layer;           pure            tables        fantasy points
+    player stats, players)  rate limit, retry  download only if changed  functions       (upserts)     per game / season
 ```
 
 ## Roadmap
 
 | # | Stage | Status |
 |---|-------|--------|
-| 1 | Python + SQL foundations: scraper → PostgreSQL → SQL models | 🟡 In progress |
+| 1 | Python + SQL foundations: ingestion → PostgreSQL → SQL models | 🟡 In progress |
 | 2 | AWS data engineering (raw data → S3, Glue/Athena) | ⬜ |
 | 3 | Apache Airflow orchestration | ⬜ |
 | 4 | AWS NFL data pipeline | ⬜ |
@@ -44,19 +44,19 @@ cp .env.example .env               # Windows: copy .env.example .env
 docker compose up -d               # starts PostgreSQL 16 on localhost:5432
 python -m ffdata init-db           # creates tables + views
 
-# 3. Scrape (start small — each page waits ~4s to be polite)
-python -m ffdata schedule  --season 2025
-python -m ffdata positions --season 2025
-python -m ffdata boxscores --season 2025 --week 1
-python -m ffdata build-models
+# 3. Load data (each request waits ~4s to be polite)
+python -m ffdata games  --season 2026            # teams + every game of the season
+python -m ffdata stats  --season 2026 --week 5   # one week of player stats (omit --week for all)
+python -m ffdata season --season 2025            # games + stats + views in one go
 python -m ffdata status
 
 # 4. Run tests
 pytest -q
 ```
 
-A full regular season is about 270 box scores, which takes roughly 20 minutes at the polite rate.
-Re-running a command is always safe: cached pages aren't re-downloaded, and upserts don't create duplicates.
+A full season takes under a minute (about 6 requests). Re-running a command is always safe: files that
+haven't changed on nflverse aren't downloaded again, and upserts don't create duplicates. During the season,
+re-run `stats` after each game day to pick up new games and stat corrections.
 
 ## Try some SQL
 
@@ -65,10 +65,10 @@ docker exec -it ffdata-postgres psql -U fantasy -d fantasy
 ```
 
 ```sql
--- Top 10 PPR performances of week 1
+-- Top 10 PPR performances of week 5
 SELECT player_name, position, team_abbr, opponent, pts_ppr
 FROM vw_player_game_fantasy
-WHERE season = 2025 AND week = 1
+WHERE season = 2026 AND week = 5
 ORDER BY pts_ppr DESC
 LIMIT 10;
 ```
@@ -78,17 +78,17 @@ LIMIT 10;
 ```
 ffdata/               Python package
   config.py           settings from .env
-  http.py             polite fetcher (robots.txt, rate limit, retries, raw cache)
-  parsers/pfr.py      HTML -> rows (pure functions)
-  teams.py            team code/abbreviation reference data
+  http.py             polite fetcher (robots.txt, rate limit, retries)
+  sources/nflverse.py find + download nflverse files; CSV -> rows (pure functions)
+  teams.py            team abbreviation reference data
   db.py               connection, migrations, models, upserts, run log
   pipeline.py         extract -> transform -> load steps
   cli.py              `python -m ffdata ...`
 sql/schema/           versioned table migrations (applied once each)
 sql/models/           SQL views rebuilt on demand (fantasy scoring)
-tests/                pytest suite + HTML fixtures (no network needed)
+tests/                pytest suite + small CSV fixtures of real rows (no network needed)
 docs/                 architecture, data dictionary, decisions, dev log
-data/raw/             cached raw HTML (git-ignored)
+data/raw/             raw downloaded files (git-ignored)
 ```
 
 ## Documentation
@@ -102,9 +102,14 @@ data/raw/             cached raw HTML (git-ignored)
 
 ## Data source & etiquette
 
-Data comes from [Pro-Football-Reference](https://www.pro-football-reference.com/) (Sports Reference LLC).
-This project is personal and educational. The scraper identifies itself, checks `robots.txt`,
-stays under Sports Reference's published limit of 20 requests per minute, and caches every page so it is
-downloaded only once. Please review Sports Reference's
-[terms of use](https://www.sports-reference.com/termsofuse.html) and
-[bot policy](https://www.sports-reference.com/bot-traffic.html) before running it, and don't redistribute their data.
+NFL data comes from **[nflverse](https://github.com/nflverse/nflverse-data)**, which publishes open football data
+for programmatic use under the [CC-BY 4.0](https://creativecommons.org/licenses/by/4.0/) license (free to use with
+credit). Thank you, nflverse!
+
+This project is personal and educational. It downloads files through the
+[GitHub REST API](https://docs.github.com/rest) (GitHub's robots.txt asks automated clients to use the API rather
+than plain download links), identifies itself with an honest User-Agent, waits between requests, and only
+downloads a file again when nflverse has published a new version.
+
+The project originally scraped Pro-Football-Reference, but its bot protection blocks automated access, so the
+source was changed. See [decision D-008](docs/decisions.md).

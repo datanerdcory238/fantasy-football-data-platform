@@ -2,12 +2,14 @@
 -- One row per player per game with fantasy points under three common scoring
 -- formats. Rebuilt every run with `python -m ffdata build-models`.
 --
--- Scoring (offense only, v1):
+-- Scoring (offense only, v2):
 --   passing: 0.04/yd (1 pt per 25), 4/TD, -2/INT
 --   rushing & receiving: 0.1/yd, 6/TD
+--   2-point conversions (pass, rush or catch): 2
+--   special-teams (return) TDs: 6
 --   fumbles lost: -2
 --   receptions: 0 (standard), 0.5 (half-PPR), 1 (PPR)
--- Not yet included: 2-point conversions, return TDs, fumble-recovery TDs.
+-- Not yet included: fumble-recovery TDs.
 
 DROP VIEW IF EXISTS vw_player_season_fantasy;
 DROP VIEW IF EXISTS vw_player_game_fantasy;
@@ -39,6 +41,8 @@ WITH base AS (
         COALESCE(o.rec, 0)          AS rec,
         COALESCE(o.rec_yds, 0)      AS rec_yds,
         COALESCE(o.rec_td, 0)       AS rec_td,
+        COALESCE(o.pass_2pt, 0) + COALESCE(o.rush_2pt, 0) + COALESCE(o.rec_2pt, 0) AS two_pt,
+        COALESCE(o.st_td, 0)        AS st_td,
         COALESCE(o.fumbles_lost, 0) AS fumbles_lost
     FROM player_game_offense o
     JOIN games   g ON g.game_id = o.game_id
@@ -51,6 +55,7 @@ scored AS (
         ( pass_yds * 0.04 + pass_td * 4 - pass_int * 2
         + rush_yds * 0.1  + rush_td * 6
         + rec_yds  * 0.1  + rec_td  * 6
+        + two_pt * 2      + st_td   * 6
         - fumbles_lost * 2 ) AS pts_standard
     FROM base
 )

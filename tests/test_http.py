@@ -8,6 +8,7 @@ class FakeResponse:
     def __init__(self, status, text):
         self.status_code, self.text = status, text
         self.ok = status < 400
+        self.content = text.encode("utf-8")
 
     def raise_for_status(self):
         raise RuntimeError(f"HTTP {self.status_code}")
@@ -17,7 +18,7 @@ class FakeSession:
     def __init__(self, robots="User-agent: *\nDisallow: /private/\n"):
         self.headers, self.calls, self.robots = {}, [], robots
 
-    def get(self, url, timeout=None):
+    def get(self, url, headers=None, timeout=None):
         self.calls.append(url)
         if url.endswith("/robots.txt"):
             return FakeResponse(200, self.robots)
@@ -55,3 +56,12 @@ def test_respects_robots_txt(tmp_path):
     fetcher, _ = make(tmp_path)
     with pytest.raises(RobotsDisallowed):
         fetcher.get("https://example.com/private/secret.htm")
+
+
+def test_download_saves_file_and_checks_robots(tmp_path):
+    fetcher, session = make(tmp_path)
+    dest = tmp_path / "nflverse" / "schedules" / "games.csv"
+    assert fetcher.download("https://example.com/assets/2", dest) == dest
+    assert dest.read_text(encoding="utf-8") == "<html>https://example.com/assets/2</html>"
+    with pytest.raises(RobotsDisallowed):
+        fetcher.download("https://example.com/private/x.csv", tmp_path / "x.csv")

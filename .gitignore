@@ -9,7 +9,7 @@ venv/
 # Secrets / local config
 .env
 
-# Scraped data (raw HTML cache) — reproducible, don't commit it
+# Downloaded raw data — reproducible, don't commit it
 data/raw/*
 !data/raw/.gitkeep
 

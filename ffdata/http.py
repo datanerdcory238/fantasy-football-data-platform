@@ -16,6 +16,7 @@ import logging
 import time
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 from urllib.parse import urlparse
 from urllib.robotparser import RobotFileParser
 
@@ -72,6 +73,19 @@ class PoliteFetcher:
         path.write_text(html, encoding="utf-8")
         return FetchResult(url, html, path, False)
 
+    def get_json(self, url: str) -> Any:
+        """Call a JSON API (e.g. GitHub's). Never cached: we ask the API to learn what changed."""
+        self._check_robots(url)
+        return self._request(url).json()
+
+    def download(self, url: str, dest: Path, headers: dict[str, str] | None = None) -> Path:
+        """Download a file and save it, byte for byte, to ``dest`` (the raw layer)."""
+        self._check_robots(url)
+        resp = self._request(url, headers)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_bytes(resp.content)
+        return dest
+
     def cache_path_for(self, url: str) -> Path:
         """Map a URL to a file path, e.g.
         https://www.pro-football-reference.com/years/2025/games.htm
@@ -104,17 +118,21 @@ class PoliteFetcher:
             time.sleep(self.delay - elapsed)
 
     def _download(self, url: str) -> str:
+        return self._request(url).text
+
+    def _request(self, url: str, headers: dict[str, str] | None = None) -> requests.Response:
+        """GET with rate limiting and retries; returns the successful response."""
         for attempt in range(1, self.max_retries + 1):
             self._wait_for_rate_limit()
             self._last_request_at = time.monotonic()
             try:
-                resp = self.session.get(url, timeout=30)
+                resp = self.session.get(url, headers=headers, timeout=60)
             except requests.RequestException as exc:
                 err: str = repr(exc)
             else:
                 if resp.status_code == 200:
                     log.info("fetched %s", url)
-                    return resp.text
+                    return resp
                 if resp.status_code not in RETRYABLE_STATUS:
                     resp.raise_for_status()
                 err = f"HTTP {resp.status_code}"

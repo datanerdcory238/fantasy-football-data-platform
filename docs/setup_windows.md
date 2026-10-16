@@ -107,7 +107,7 @@ cd $HOME\Documents
 git clone https://github.com/datanerdcory238/fantasy-football-data-platform.git
 cd fantasy-football-data-platform
 ```
-Then follow the **Quick start** in the README to set up the Python environment, `.env`, database and first scrape.
+Then follow the **Quick start** in the README to set up the Python environment, `.env`, database and first data load.
 `.env`, `.venv\` and `data\raw\` are not in GitHub on purpose (git-ignored), so they're recreated by those steps.
 
 ### Mistake to avoid: running Git in the wrong folder

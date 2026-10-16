@@ -4,6 +4,53 @@ Newest entries at the top. Each entry covers what was done, what was learned, an
 
 ---
 
+## 2026-10-16: PFR blocked us, switched to nflverse, loaded 2025 + 2026
+
+**Done**
+- First live run against Pro-Football-Reference: **HTTP 403 Forbidden**. Tried a browser User-Agent in `.env`:
+  still 403 (bot protection checks more than the label). Put the honest User-Agent back.
+- Decided to switch to **nflverse** (open data, CC-BY 4.0, updated ~daily in season) because the project will be
+  automated and needs a source that allows it. Decisions D-008 to D-011 in `decisions.md`.
+- Found that GitHub's robots.txt disallows `/*/download` for bots, so files are fetched through the **GitHub API**.
+  Each raw file gets a `.meta.json` with its nflverse version, so unchanged files aren't downloaded again.
+- Code: new `ffdata/sources/nflverse.py`; `http.py` gained `get_json` and `download`; `pipeline.py` and `cli.py`
+  now have `games`, `stats [--week]`, `season`; `teams.py` uses nflverse abbreviations; PFR parser code removed.
+- Migration `002_nflverse_source.sql`: cleared the old PFR team rows; added `pass_2pt`, `rush_2pt`, `rec_2pt`,
+  `st_td`, and `src_pts_standard` / `src_pts_ppr` (nflverse's points, for checking only). The view now scores
+  2-point conversions (+2) and special-teams TDs (+6).
+- Tests rewritten around small CSV fixtures of real rows (Rodgers, Aaron Jones, Mike Evans, a FB, a K, an LB):
+  `pytest -q` → **29 passed**.
+- Loaded data, one step at a time:
+  - 2026 Week 5 → 346 rows; then all of 2026 → 1,821 rows (weeks 1–5 + Thursday of week 6), 272 games.
+  - 2025 full season → 285 games (272 REG + 13 playoff), 6,396 rows.
+  - **Data-quality check: our points = nflverse's points on all 8,217 rows (0 mismatches).**
+- 2025 PPR leaders (regular season): McCaffrey 416.6, Nacua 375.0, Bijan Robinson 370.8.
+
+**Learned**
+- Reading a traceback: the **last line** is the actual error. `403` = "understood, but refused".
+- User-Agent = the label a client sends to identify itself. Bot protection can also check connection
+  fingerprints and run JavaScript challenges, which is why changing the label alone didn't work.
+- robots.txt rules use `*` wildcards that Python's `robotparser` doesn't understand, so read it yourself for new sources.
+- An **API** is a door built for programs. GitHub's API also says *when* a file last changed, which enables
+  **incremental loading** (we saw it: `pages_cached: 2`, nothing downloaded). nflverse republished `games.csv`
+  two minutes after our first load, and the pipeline correctly downloaded the new version.
+- **Upserts in practice**: reloading Week 5 inside the full-season load updated 346 rows instead of duplicating them.
+- **Migrations** are the database's version history (`schema_migrations`). `ALTER TABLE ... ADD COLUMN` adds
+  columns at the end.
+- Timestamps in the database are **UTC** (4 hours ahead of Eastern time in October).
+- **Python 3.15** now refuses to parse a date without a year (`"September 8"`) because Feb 29 would be ambiguous.
+  A language upgrade can break code that hasn't changed (this hit the old PFR parser, now removed).
+- **Fakes in tests** must keep up with the real thing: adding a `headers=` argument broke the fake HTTP session.
+- Scoring formats change who's valuable: Gibbs and Nacua tied at 37.7 PPR in 2026 Week 5, but Gibbs led by 12 in
+  standard. Compare players across seasons with **per-game** numbers, not totals.
+
+**Next**
+- [ ] Commit and push; check CI on GitHub.
+- [ ] Re-run `python -m ffdata stats --season 2026` after each game day.
+- [ ] Explore the data in SQL/DBeaver; write `docs/user_guide.md`; make the points check a repeatable command.
+
+---
+
 ## 2026-10-15/16: Database created, tests passing, switching to Claude Code
 
 **Done**
